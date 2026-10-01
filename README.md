@@ -2,7 +2,7 @@
 
 ## Deploy on Vercel
 
-This repository is configured as a Vercel monorepo: the Vite client is built as a static site and `api/[...path].js` serves the Express API as a Vercel Function.
+This repository is configured for Vercel's Express deployment: the root `index.js` exposes the Express app, and the Vite client builds into the root `public` directory for static delivery.
 
 1. Import this repository into Vercel and keep the project root set to the repository root.
 2. Create a MongoDB Atlas database and allow connections from Vercel in Atlas Network Access. Copy the database connection string.
@@ -13,7 +13,7 @@ This repository is configured as a Vercel monorepo: the Vite client is built as 
    - `ADMIN_EMAIL`: email address that should receive the first-admin role when registering.
    - `BLOB_READ_WRITE_TOKEN`: read/write token for the Vercel Blob store.
    - `VITE_API_URL`: `/api` (the same-origin Vercel API).
-5. Deploy. Root `vercel.json` builds `client/dist`, routes `/api/*` to the Express function, and serves the client for other paths.
+5. Deploy. Vercel detects the root Express entry point, serves built files from `public`, and routes API requests through Express. Non-API page paths are rewritten to the Vite `index.html` for client-side routing.
 
 Images upload from the browser directly to Vercel Blob using short-lived client upload tokens issued after authentication. Each image is limited to JPG, PNG, or WebP and 5 MB; the server stores Blob URLs in MongoDB Atlas.
 
