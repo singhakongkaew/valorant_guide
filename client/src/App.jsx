@@ -14,7 +14,7 @@ import SovaArt from '../../image/VALORENT AGENT _ SOVA.jpg';
 import ViperArt from '../../image/VALORENT AGENT _ VIPER.jpg';
 
 const TOKEN_KEY = 'valorant-guide-token';
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API_URL || '/api';
 
 // Swap each gradient in `image` for an image URL when agent artwork is ready.
 export const agents = [

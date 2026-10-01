@@ -264,7 +264,7 @@ export function SearchButton() {
   useEffect(() => {
     if (!open || !normalize(query)) { setCommunityResults([]); return; }
     const timer = window.setTimeout(() => {
-      const api = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const api = import.meta.env.VITE_API_URL || '/api';
       fetch(`${api}/guides?q=${encodeURIComponent(query)}&limit=8`).then((response) => response.ok ? response.json() : { posts: [] }).then((data) => setCommunityResults((data.posts || []).map((post) => ({ record: { id: `community:${post._id}`, section: 'Community', title: post.title, subtitle: post.category, summary: post.description, body: [], url: `/guides/${post._id}` } })))).catch(() => setCommunityResults([]));
     }, 250);
     return () => window.clearTimeout(timer);

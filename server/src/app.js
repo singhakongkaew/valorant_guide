@@ -5,11 +5,13 @@ const authRoutes = require("./routes/auth.routes");
 const adminRoutes = require("./routes/admin.routes");
 const guidePostRoutes = require("./routes/guidePost.routes");
 const { notFound, errorHandler } = require("./middlewares/error.middleware");
+const connectDB = require("./config/db");
 const app = express();
 
 // 1. Global middleware
 app.use(cors());
 app.use(express.json());
+app.use(async (_req, _res, next) => { try { await connectDB(); next(); } catch (error) { next(error); } });
 
 // 2. Routes
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
