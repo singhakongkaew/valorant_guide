@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SearchButton } from './Search.jsx';
 import GekkoArt from '../../image/download (1).jpg';
 import NeonArt from '../../image/VALORENT AGENT _ NEON.jpg';
@@ -12,6 +12,9 @@ import PhoenixArt from '../../image/VALORENT AGENT _ PHOENIX.jpg';
 import SageArt from '../../image/VALORENT AGENT _ SAGE.jpg';
 import SovaArt from '../../image/VALORENT AGENT _ SOVA.jpg';
 import ViperArt from '../../image/VALORENT AGENT _ VIPER.jpg';
+
+const TOKEN_KEY = 'valorant-guide-token';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Swap each gradient in `image` for an image URL when agent artwork is ready.
 export const agents = [
@@ -44,12 +47,12 @@ const expandedData = {
     summary: 'Jett creates first contact with speed, then escapes before opponents can trade her. Coordinate each entry and keep an exit route for every aggressive peek.', difficulty: 3,
     abilities: [
       ['Cloudburst', 'Break sightlines with a fast, short-lived smoke.', 'Steer the projectile around a corner to cover a crossing or isolate one angle.', ['Curve it around the corner you plan to cross.', 'Use it to break one sightline, not cover a whole site.', 'Pair it with Tailwind for a quick exit.'], ['You need to cross a watched lane.', 'You want to isolate one angle during entry.'], 'Avoid smoking a space your team needs to see or leaving yourself without an exit.'],
-      ['Updraft', 'Reach elevated angles and change your entry path.', 'Jett launches upward to reach vertical positions. Sound and limited air control make the landing spot important.', ['Pair height with a smoke.', 'Use it to clear a known close angle.', 'Coordinate with a teammateÃ¢â‚¬â„¢s flash or scan.'], ['A vertical angle breaks a common hold.', 'You need to cross low cover on a coordinated hit.'], 'Avoid jumping into several held angles without team support.'],
+      ['Updraft', 'Reach elevated angles and change your entry path.', 'Jett launches upward to reach vertical positions. Sound and limited air control make the landing spot important.', ['Pair height with a smoke.', 'Use it to clear a known close angle.', 'Coordinate with a teammate’s flash or scan.'], ['A vertical angle breaks a common hold.', 'You need to cross low cover on a coordinated hit.'], 'Avoid jumping into several held angles without team support.'],
       ['Tailwind', 'Dash out of danger or through a prepared entry.', 'Activate to prepare the dash, then trigger it within the short window. A kill refreshes the dash during its active period.', ['Activate before exposing yourself.', 'Use smoke or teammate utility to cover the path.', 'Plan a safe destination before taking the duel.'], ['You have utility support for first contact.', 'You need to escape after a risky peek.'], 'Avoid dry dashing before teammates can trade or follow.'],
       ['Blade Storm', 'Take precise fights with a mobile set of knives.', 'Throw accurate knives that refresh on a kill. Primary fire throws one; alternate fire throws the remaining knives in a close-range burst.', ['Use primary fire at range.', 'Save alternate fire for close duels.', 'Pair knives with an eco round.'], ['You can take a supported opening duel.', 'Your team needs a strong low-cost round.'], 'Avoid a close-range burst into a long sightline.'],
     ],
     mistakes: [['Dashing before the team is ready', 'Call the entry and wait for utility.'], ['Taking a duel without an exit', 'Plan cover or a dash destination first.'], ['Using Updraft in full view', 'Pair height with cover or a distraction.'], ['Holding Cloudburst too long', 'Use it to cross or isolate a real threat.']],
-    combos: [['Sage', 'Sage slows a route so Jett can take a safer, predictable entry duel.'], ['Sova', 'A reveal gives Jett a clear dash target and limits surprise angles.'], ['Breach', 'BreachÃ¢â‚¬â„¢s stun and flash create a window for Jett to enter first.']], maps: [['Ascent', 'Dash through mid smokes to pressure the site divide.'], ['Haven', 'Fast rotations punish gaps between three sites.'], ['Icebox', 'Vertical routes create useful off-angle entries.']],
+    combos: [['Sage', 'Sage slows a route so Jett can take a safer, predictable entry duel.'], ['Sova', 'A reveal gives Jett a clear dash target and limits surprise angles.'], ['Breach’s stun and flash create a window for Jett to enter first.']], maps: [['Ascent', 'Dash through mid smokes to pressure the site divide.'], ['Haven', 'Fast rotations punish gaps between three sites.'], ['Icebox', 'Vertical routes create useful off-angle entries.']],
   },
   Sage: {
     summary: 'Sage slows the pace of a round, seals routes, and keeps a teammate in the fight. Her strongest value comes from timing utility around a coordinated hold or retake.', difficulty: 2,
@@ -102,18 +105,28 @@ function AgentCard({ agent, index, total, offset, onSelect, onOpen, expanded, ho
         <span className="name-line" />
         <span className="agent-copy">{agent.role}. {agent.description}</span>
       </span>
-      {offset === 0 && !expanded && <span className="card-open-hint" onClick={(event) => { event.stopPropagation(); onOpen(); }}>View mechanics Ã¢â€ â€”</span>}
+      {offset === 0 && !expanded && <span className="card-open-hint" onClick={(event) => { event.stopPropagation(); onOpen(); }}>View mechanics →</span>}
     </button>
   );
 }
 
 export default function App() {
+  const [account, setAccount] = useState(null);
   const [selected, setSelected] = useState(() => { const id=location.hash.match(/^#\/(.+)$/)?.[1];return Math.max(0,agents.findIndex(a=>a.name.toLowerCase()===id)); });
   const [expanded, setExpanded] = useState(() => /^#\/[a-z]+$/i.test(location.hash));
   const [autoRotate, setAutoRotate] = useState(true);
   const [hoveredAgent, setHoveredAgent] = useState(null);
   const [activeAbility, setActiveAbility] = useState(0);
   const agent = agents[selected];
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((response) => { if (!response.ok) throw new Error('Session expired'); return response.json(); })
+      .then((data) => setAccount(data.user))
+      .catch(() => { localStorage.removeItem(TOKEN_KEY); setAccount(null); });
+  }, []);
+  const logout = () => { localStorage.removeItem(TOKEN_KEY); setAccount(null); };
   const detail = expandedData[agent.name] || getDetails(agent);
   const abilityOrder = [1, 2, 0, 3];
   const headingRef=useRef(null),openButtonRef=useRef(null),cardRef=useRef(null);
@@ -168,10 +181,11 @@ export default function App() {
       <header className="topbar">
         <a className="brand" href="#home" aria-label="Valorant Mechanics home">V<span>/</span>GUIDE</a>
         <nav className="nav" aria-label="Main navigation">
-          <a href="#agents" aria-current="page">Agents</a><a href="/gunplay">Gunplay</a><a href="/movement">Movement</a>
+          <a href="#agents" aria-current="page">Agents</a><a href="/gunplay">Gunplay</a><a href="/movement">Movement</a><a href="/guides">Guides</a>
         </nav>
         <div className="actions">
           <SearchButton />
+          {account ? <>{account.role === 'admin' && <a className="account-link" href="/auth">Admin Console</a>}<span className="account-name">{account.name}</span><button className="account-link account-logout" type="button" onClick={logout}>Sign out</button></> : <a className="account-link" href="/auth">Sign in</a>}
         </div>
       </header>
       <main className="main" id="home">
@@ -228,4 +242,3 @@ export default function App() {
     </div>
   );
 }
-

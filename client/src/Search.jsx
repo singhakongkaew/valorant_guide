@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { createPortal } from 'react-dom';
 
 const SearchContext = createContext(null);
-const sections = ['Agents', 'Gunplay', 'Movement', 'Economy'];
+const sections = ['Agents', 'Gunplay', 'Movement', 'Community'];
 const sectionOrder = Object.fromEntries(sections.map((section, index) => [section, index]));
 const recentSearchKey = 'vguide-recent-searches';
 const popularSearches = ['Counter-strafing', 'Crosshair placement', 'Loss bonus', 'Jett', 'Sage', 'Round calculator'];
@@ -210,7 +210,7 @@ function SearchSectionIcon({ section }) {
     Agents: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M4 21a8 8 0 0 1 16 0'],
     Gunplay: ['M12 3v3', 'M12 18v3', 'M3 12h3', 'M18 12h3', 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z'],
     Movement: ['M4 8h15', 'm15 4 4 4-4 4', 'M20 16H5', 'm9 12-4 4 4 4'],
-    Economy: ['M12 3v18', 'M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
+    Community: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M4 21a8 8 0 0 1 16 0'],
   };
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[section].map((path) => <path key={path} d={path} />)}</svg>;
 }
@@ -260,11 +260,21 @@ export function SearchButton() {
   const inputRef = useRef(null);
   const dialogRef = useRef(null);
   const results = useMemo(() => searchIndex(index, query), [index, query]);
-  const resultCount = `${results.length} result${results.length === 1 ? '' : 's'}`;
+  const [communityResults, setCommunityResults] = useState([]);
+  useEffect(() => {
+    if (!open || !normalize(query)) { setCommunityResults([]); return; }
+    const timer = window.setTimeout(() => {
+      const api = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      fetch(`${api}/guides?q=${encodeURIComponent(query)}&limit=8`).then((response) => response.ok ? response.json() : { posts: [] }).then((data) => setCommunityResults((data.posts || []).map((post) => ({ record: { id: `community:${post._id}`, section: 'Community', title: post.title, subtitle: post.category, summary: post.description, body: [], url: `/guides/${post._id}` } })))).catch(() => setCommunityResults([]));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [open, query]);
+  const allResults = useMemo(() => [...results, ...communityResults], [results, communityResults]);
+  const resultCount = `${allResults.length} result${allResults.length === 1 ? '' : 's'}`;
   const queryWords = normalize(query).split(' ').filter(Boolean);
   const grouped = sections.map((section) => ({
     section,
-    results: results.filter(({ record }) => record.section === section),
+    results: allResults.filter(({ record }) => record.section === section),
   })).filter((group) => group.results.length > 0);
 
   useEffect(() => {
@@ -323,9 +333,9 @@ export function SearchButton() {
   };
 
   const moveSelection = (direction) => {
-    if (!results.length) return;
-    setActiveIndex((current) => (current + direction + results.length) % results.length);
-    requestAnimationFrame(() => document.getElementById(`search-result-${(activeIndex + direction + results.length) % results.length}`)?.scrollIntoView({ block: 'nearest' }));
+    if (!allResults.length) return;
+    setActiveIndex((current) => (current + direction + allResults.length) % allResults.length);
+    requestAnimationFrame(() => document.getElementById(`search-result-${(activeIndex + direction + allResults.length) % allResults.length}`)?.scrollIntoView({ block: 'nearest' }));
   };
 
   const handleDialogKeyDown = (event) => {
@@ -375,7 +385,7 @@ export function SearchButton() {
                 aria-autocomplete="list"
                 aria-expanded="true"
                 aria-controls="site-search-results"
-                aria-activedescendant={results.length ? `search-result-${activeIndex}` : undefined}
+                aria-activedescendant={allResults.length ? `search-result-${activeIndex}` : undefined}
                 placeholder="Search agents, techniques, lessons..."
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -384,7 +394,7 @@ export function SearchButton() {
                   if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1); }
                   if (event.key === 'Enter') {
                     event.preventDefault();
-                    if (results[activeIndex]) selectResult(results[activeIndex].record);
+                    if (allResults[activeIndex]) selectResult(allResults[activeIndex].record);
                     else close();
                   }
                   if (event.key === 'Escape') { event.preventDefault(); close(); }
@@ -407,13 +417,13 @@ export function SearchButton() {
                     </section>
                   )}
                 </>
-              ) : results.length > 0 ? (
+              ) : allResults.length > 0 ? (
                 <div className="site-search-results" id="site-search-results" role="listbox" aria-label="Search results">
                   {grouped.map((group) => (
                     <section className="site-search-group" role="group" aria-label={group.section} key={group.section}>
                       <h2>{group.section}</h2>
                       {group.results.map(({ record }) => {
-                        const resultIndex = results.findIndex((result) => result.record.id === record.id);
+                        const resultIndex = allResults.findIndex((result) => result.record.id === record.id);
                         const subtitle = ['beginner', 'intermediate', 'advanced'].includes(record.subtitle)
                           ? <span className="card-level"><span className="card-level-bars" aria-hidden="true">{[1, 2, 3].map((bar) => <i key={bar} className={bar <= ({ beginner: 1, intermediate: 2, advanced: 3 }[record.subtitle] || 0) ? 'filled' : ''} />)}</span><span>{record.subtitle}</span></span>
                           : record.subtitle;

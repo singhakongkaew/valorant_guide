@@ -1,0 +1,1 @@
+module.exports = { AUTO_APPROVE: false };
