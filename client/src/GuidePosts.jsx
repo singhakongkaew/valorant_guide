@@ -4,7 +4,29 @@ import { upload } from '@vercel/blob/client';
 const API = import.meta.env.VITE_API_URL || '/api';
 const TOKEN = 'valorant-guide-token';
 const categories = ['gunplay', 'movement', 'agents', 'other'], levels = ['beginner', 'intermediate', 'advanced'];
-async function api(path, options = {}) { const token = localStorage.getItem(TOKEN); const response = await fetch(`${API}/guides${path}`, { ...options, headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } }); const data = await response.json().catch(() => ({})); if (!response.ok) { const error = new Error(data.message || 'Request failed.'); error.fields = data.fields || {}; throw error; } return data; }
+async function api(path, options = {}) {
+  const token = localStorage.getItem(TOKEN);
+  let response;
+  try {
+    response = await fetch(`${API}/guides${path}`, {
+      ...options,
+      headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
+    });
+  } catch {
+    throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง');
+  }
+
+  const responseText = await response.text();
+  let data = {};
+  try { data = responseText ? JSON.parse(responseText) : {}; } catch { /* The deployment may return an HTML error page. */ }
+  if (!response.ok) {
+    const fallback = responseText && !responseText.trimStart().startsWith('<') ? responseText.slice(0, 240) : '';
+    const error = new Error(data.message || fallback || `เซิร์ฟเวอร์ตอบกลับผิดพลาด (HTTP ${response.status})`);
+    error.fields = data.fields || {};
+    throw error;
+  }
+  return data;
+}
 const statusText = (status) => ({ pending: '◷ Pending review', rejected: '! Rejected', hidden: '◉ Hidden', approved: '✓ Approved' }[status] || status);
 const dateText = (date) => new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 export default function GuidePosts() { const path = location.pathname.replace(/\/$/, '') || '/guides'; const id = path.match(/^\/guides\/([^/]+)$/)?.[1]; if (path === '/guides/new' || path.endsWith('/edit')) return <PostForm id={path.endsWith('/edit') ? path.split('/')[2] : null} />; if (path === '/guides/mine') return <Mine />; if (path === '/admin/guides') return <Admin />; if (id) return <Detail id={id} />; return <Feed />; }
