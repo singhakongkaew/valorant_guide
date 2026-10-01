@@ -10,12 +10,16 @@ router.get("/mine", authenticate, c.mine);
 router.get("/admin/pending", authenticate, requireAdmin, c.pending);
 router.get("/:id", optionalAuthenticate, c.get);
 router.post("/upload-token", (req, res, next) => {
-  if (req.body?.type === "blob.generate-client-token") return authenticate(req, res, next);
+  if (req.body?.type === "blob.generate-client-token") {
+    if (typeof req.body.clientPayload !== "string") return res.status(401).json({ message: "Sign in before uploading images." });
+    req.headers.authorization = `Bearer ${req.body.clientPayload}`;
+    return authenticate(req, res, next);
+  }
   next();
 }, async (req, res, next) => {
   try {
     const json = await handleUpload({ body: req.body, request: req, onBeforeGenerateToken: async (_pathname, clientPayload) => {
-      if (clientPayload !== String(req.user._id) || !_pathname.startsWith(`guide-posts/${req.user._id}/`)) throw new Error("Invalid upload owner or path.");
+      if (!_pathname.startsWith(`guide-posts/${req.user._id}/`)) throw new Error("Invalid upload owner or path.");
       return { allowedContentTypes: ["image/jpeg", "image/png", "image/webp"], maximumSizeInBytes: 5 * 1024 * 1024, addRandomSuffix: false, tokenPayload: clientPayload };
     }, onUploadCompleted: async () => {} });
     res.json(json);
